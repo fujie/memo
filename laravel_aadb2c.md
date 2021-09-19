@@ -18,6 +18,7 @@
 ```
 
 ## SocialiteにAzure AD B2Cのモジュールをコピーする
+モジュールは[こちら](https://github.com/fujie/Providers-1/tree/master/src/AzureADB2C)
 ```
 % mkdir ./vendor/socialiteproviders
 % cp -r xxx/AzureADB2C ./vendor/socialiteproviders
