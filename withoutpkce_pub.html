@@ -1,0 +1,117 @@
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>LINE Login sample</title>
+  </head>
+  <body>
+    <h1>LINE Login Sample</h1>
+    <button id="startButton">Login</button>
+    <div id="result"></div>
+    <script>
+      // LINEログインのエンドポイント
+      const authorizeEndpoint = "https://access.line.me/oauth2/v2.1/authorize";
+      const tokenEndpoint = "https://api.line.me/oauth2/v2.1/token";
+      // client_id
+      const clientId = "{client_id}";
+      // client_secret
+      const clientSecret = "{client_secret}";
+
+      // クエリパラメータから認可コード（code）を取り出す
+      if (window.location.search) {
+            var args = new URLSearchParams(window.location.search);
+            var code = args.get("code");
+
+            // codeがあればtokenエンドポイントへ投げ込んでtokenと交換する
+            if (code) {
+                var xhr = new XMLHttpRequest();
+
+                xhr.onload = function() {
+                    var response = xhr.response;
+                    var message;
+
+                    if (xhr.status == 200) {
+                        // tokenエンドポイントから200が帰ってきたらresponseからid_tokenを取り出してdecodeする
+                        message = "Hello " + decodeJwt(response.id_token).name;
+                    }
+                    else {
+                        message = "Error: " + response.error_description + " (" + response.error + ")";
+                    }
+
+                    // resultにメッセージを表示する
+                    document.getElementById("result").innerHTML = message;
+                };
+
+                // Tokenエンドポイントへcodeとcode_verifierをPOSTする
+                // code_verifierはsessionStorageから取り出して利用する
+                xhr.responseType = 'json';
+                xhr.open("POST", tokenEndpoint, true);
+                xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+                xhr.send(new URLSearchParams({
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    grant_type: "authorization_code",
+                    redirect_uri: location.href.replace(location.search, ''),
+                    code: code
+                }));
+            }
+        }
+
+        // ボタンをクリックしてフロー開始
+        document.getElementById("startButton").onclick = function() {
+            // code_verifierを生成する
+            var codeVerifier = generateRandomString(64);
+
+            // code_verifierからcode_challengeを生成する
+            generateCodeChallenge(codeVerifier).then(function(codeChallenge) {
+                // code_verifierをsessionStorageに保存する
+                window.sessionStorage.setItem("code_verifier", codeVerifier);
+
+                var redirectUri = window.location.href.split('?')[0];
+                var args = new URLSearchParams({
+                    response_type: "code",
+                    client_id: clientId,
+                    redirect_uri: redirectUri,
+                    state: "hoge",  // stateは適当。真似しないように
+                    scope: "openid profile email"
+                });
+                window.location = authorizeEndpoint + "/?" + args;
+            });
+        }
+
+        // code_challengeを生成する
+        async function generateCodeChallenge(codeVerifier) {
+            // SHA256で生成する
+            var digest = await crypto.subtle.digest("SHA-256",
+                new TextEncoder().encode(codeVerifier));
+
+            // base64urlエンコードする
+            return btoa(String.fromCharCode(...new Uint8Array(digest)))
+                .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
+        }
+
+        // code_verifierを生成する
+        function generateRandomString(length) {
+            var text = "";
+            var possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+            for (var i = 0; i < length; i++) {
+                text += possible.charAt(Math.floor(Math.random() * possible.length));
+            }
+
+            return text;
+        }
+
+        // id_tokenのdecode
+        // 本当はid_tokenの検証もする必要あり。真似しないように。
+        const decodeJwt = (token) => {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          return JSON.parse(decodeURIComponent(escape(window.atob(base64))));
+        }
+
+    </script>
+    <script type="module">
+        //        
+    </script>
+  </body>
+</html>
